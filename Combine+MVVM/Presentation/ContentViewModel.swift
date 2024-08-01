@@ -8,7 +8,7 @@
 import Foundation
 import Combine
 
-class ContentViewModel: ObservableObject {
+final class ContentViewModel: ObservableObject {
     
     @Published var todos: [ToDo] = []
     @Published var showAlert: Bool = false
@@ -16,10 +16,10 @@ class ContentViewModel: ObservableObject {
     @Published var showLoader: Bool = false
     
     
-    var cancelSet: Set<AnyCancellable> = []
+    private var cancelSet: Set<AnyCancellable> = []
     func getData() {
         showLoader = true
-        let publisher: AnyPublisher<[ToDo], APIError> = NetworkManager.shared.getData()
+        let publisher: AnyPublisher<[ToDo], APIError> = NetworkManager.shared.getData(using: "https://jsonplaceholder.typicode.com/todos")
         publisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] apiError in
@@ -36,6 +36,5 @@ class ContentViewModel: ObservableObject {
                 todos = data
             }
             .store(in: &cancelSet)
-
     }
 }

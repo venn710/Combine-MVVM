@@ -9,28 +9,42 @@ import Foundation
 import Combine
 
 class NetworkManager {
-    static let shared: NetworkManager = NetworkManager()
-    func getData<T: Codable>() -> AnyPublisher<T, APIError> {
-        return URLSession
-            .shared
-            .dataTaskPublisher(for: URL(string: "https://jsonplaceholder.typicode.com/todos")!)
-            .delay(for: 3, scheduler: DispatchQueue.main)
-            .tryMap { data, response in
-                guard let response = response as? HTTPURLResponse, (200...299).contains(response.statusCode) else {
-                    throw APIError.invalidResponse
-                }
-                let jsonDecoder = JSONDecoder()
-                return try jsonDecoder.decode(T.self, from: data)
+    static let shared: NetworkManager = NetworkManager() // 1
+    private init() {}
+    func getData<T: Codable>(using urlString: String) -> AnyPublisher<T, APIError> { // 2
+        
+        do {
+            guard let url = URL(string: urlString) else {
+                throw APIError.invalidURL
             }
-            .mapError { error in
-                if let error1 = error as? APIError {
-                    return error1
+            return URLSession
+                .shared
+                .dataTaskPublisher(for: url) // 3
+                .delay(for: 3, scheduler: DispatchQueue.main) // 4
+                .tryMap { data, response in // 5
+                    guard let response = response as? HTTPURLResponse, (200...299).contains(response.statusCode) else {
+                        throw APIError.invalidResponse
+                    }
+                    let jsonDecoder = JSONDecoder()
+                    return try jsonDecoder.decode(T.self, from: data) // 6
                 }
-                if let _ = error as? DecodingError {
-                    return APIError.invalidData
+                .mapError { error in // 7
+                    if let error1 = error as? APIError {
+                        return error1
+                    }
+                    if let _ = error as? DecodingError {
+                        return APIError.invalidData
+                    }
+                    return APIError.defaultError(error.localizedDescription)
                 }
-                return APIError.defaultError(error.localizedDescription)
+                .eraseToAnyPublisher() // 8
+        } catch { // 9
+            if let error1 = error as? APIError {
+                return Fail<T, APIError>(error: error1)
+                    .eraseToAnyPublisher()
             }
-            .eraseToAnyPublisher()
-            }
+            return Fail<T, APIError>(error: APIError.defaultError(error.localizedDescription))
+                .eraseToAnyPublisher()
+        }
+    }
 }
